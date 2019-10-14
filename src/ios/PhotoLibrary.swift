@@ -192,7 +192,7 @@ import Foundation
     }
 
 
-    @objc(returnPictureData:)
+    @objc(returnPictureData:::)
     func returnPictureData(callbackId : String, base64: String?, mimeType: String?) {
         let pluginResult = (base64 != nil) ?
             CDVPluginResult(
