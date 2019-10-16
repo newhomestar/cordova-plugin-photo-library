@@ -35,18 +35,20 @@ final class PhotoLibraryService {
     let cachingImageManager: PHCachingImageManager!
 
     let contentMode = PHImageContentMode.aspectFill // AspectFit: can be smaller, AspectFill - can be larger. TODO: resize to exact size
-
     var cacheActive = false
+
+    var photo : UIImage? = nil
+    var images : [NSDictionary] = [NSDictionary]()
 
     let mimeTypes = [
         "flv":  "video/x-flv",
         "mp4":  "video/mp4",
-        "m3u8":	"application/x-mpegURL",
+        "m3u8":    "application/x-mpegURL",
         "ts":   "video/MP2T",
-        "3gp":	"video/3gpp",
-        "mov":	"video/quicktime",
-        "avi":	"video/x-msvideo",
-        "wmv":	"video/x-ms-wmv",
+        "3gp":    "video/3gpp",
+        "mov":    "video/quicktime",
+        "avi":    "video/x-msvideo",
+        "wmv":    "video/x-ms-wmv",
         "gif":  "image/gif",
         "jpg":  "image/jpeg",
         "jpeg": "image/jpeg",
@@ -104,6 +106,92 @@ final class PhotoLibraryService {
 
     }
 
+    func getPhotosFromAlbum(_ albumTitle: String) -> [NSDictionary] {
+
+        print("getPhotosFromAlbum 1");
+        print(albumTitle);
+
+        self.images = [NSDictionary]()
+
+        var assetCollection = PHAssetCollection()
+        var albumFound = Bool()
+        var photoAssets = PHFetchResult<AnyObject>()
+        let fetchOptions = PHFetchOptions()
+
+        fetchOptions.predicate = NSPredicate(format: "title = %@", albumTitle)
+        let collection:PHFetchResult = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: fetchOptions)
+
+        print("getPhotosFromAlbum 2");
+
+        if let firstObject = collection.firstObject{
+            //found the album
+            assetCollection = firstObject
+            albumFound = true
+        }
+        else { albumFound = false }
+        _ = collection.count
+        photoAssets = PHAsset.fetchAssets(in: assetCollection, options: nil) as! PHFetchResult<AnyObject>
+
+
+
+        photoAssets.enumerateObjects{(object: AnyObject!,
+            count: Int,
+            stop: UnsafeMutablePointer<ObjCBool>) in
+
+            if object is PHAsset{
+                let asset = object as! PHAsset
+                print("Asset")
+                print(asset)
+
+                let semaphore = DispatchSemaphore(value: 0)
+
+                let libraryItem = self.assetToLibraryItem(asset: asset, useOriginalFileNames: false, includeAlbumData: false);
+
+                self.getCompleteInfo(libraryItem, completion: { (fullPath, libraryItemOrigin) in
+                    libraryItem["filePath"] = fullPath
+                    semaphore.signal()
+                })
+
+                semaphore.wait()
+
+                self.images.append(libraryItem)
+
+//                let imageSize = CGSize(width: asset.pixelWidth,
+//                                       height: asset.pixelHeight)
+//
+//                /* For faster performance, and maybe degraded image */
+//                let options = PHImageRequestOptions()
+//                options.deliveryMode = .fastFormat
+//                options.isSynchronous = true
+//
+//                imageManager.requestImage(for: asset,
+//                                          targetSize: imageSize,
+//                                          contentMode: .aspectFill,
+//                                          options: options,
+//                                          resultHandler: {
+//                                            (image, info) -> Void in
+//                                            self.photo = image!
+//                                            /* The image is now available to us */
+//                                            self.addImgToArray(uploadImage: self.photo!)
+//                                            print("enum for image, This is number 2")
+//
+//                })
+            }
+        }
+
+        print("getPhotosFromAlbum 3");
+
+        return self.images;
+    }
+
+
+
+
+
+//    func addImgToArray(uploadImage:UIImage)
+//    {
+//        self.images.append(uploadImage)
+//    }
     func getLibrary(_ options: PhotoLibraryGetLibraryOptions, completion: @escaping (_ result: [NSDictionary], _ chunkNum: Int, _ isLastChunk: Bool) -> Void) {
 
         if(options.includeCloudData == false) {
@@ -134,7 +222,7 @@ final class PhotoLibraryService {
 
 
 
-	// TODO: do not restart caching on multiple calls
+    // TODO: do not restart caching on multiple calls
 //        if fetchResult.count > 0 {
 //
 //            var assets = [PHAsset]()
@@ -146,7 +234,6 @@ final class PhotoLibraryService {
 //            self.cachingImageManager.startCachingImages(for: assets, targetSize: CGSize(width: options.thumbnailWidth, height: options.thumbnailHeight), contentMode: self.contentMode, options: self.imageRequestOptions)
 //            self.cacheActive = true
 //        }
-
         var chunk = [NSDictionary]()
         var chunkStartTime = NSDate()
         var chunkNum = 0
@@ -162,7 +249,7 @@ final class PhotoLibraryService {
 
             chunk.append(libraryItem)
 
-            self.getCompleteInfo(libraryItem, completion: { (fullPath) in
+            self.getCompleteInfo(libraryItem, completion: { (fullPath, libraryItemOrigin) in
 
                 libraryItem["filePath"] = fullPath
 
@@ -194,13 +281,13 @@ final class PhotoLibraryService {
     }
 
 
-    func getCompleteInfo(_ libraryItem: NSDictionary, completion: @escaping (_ fullPath: String?) -> Void) {
+    func getCompleteInfo(_ libraryItem: NSDictionary, completion: @escaping (_ fullPath: String?,_ libraryItemOrigin: NSDictionary) -> Void) {
 
 
         let ident = libraryItem.object(forKey: "id") as! String
         let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [ident], options: self.fetchOptions)
         if fetchResult.count == 0 {
-            completion(nil)
+            completion(nil, libraryItem)
             return
         }
 
@@ -214,15 +301,15 @@ final class PhotoLibraryService {
 
             if(mediaType == "image") {
                 PHImageManager.default().requestImageData(for: asset, options: self.imageRequestOptions) {
-                    (imageData: Data?, dataUTI: String?, orientation: UIImageOrientation, info: [AnyHashable: Any]?) in
+                    (imageData: Data?, dataUTI: String?, orientation: UIImage.Orientation, info: [AnyHashable: Any]?) in
 
                     if(imageData == nil) {
-                        completion(nil)
+                        completion(nil, libraryItem)
                     }
                     else {
-                        let file_url:URL = info!["PHImageFileURLKey"] as! URL
+                        let file_url:NSString = (info!["PHImageFileUTIKey"] as? NSString)!
 //                        let mime_type = self.mimeTypes[file_url.pathExtension.lowercased()]!
-                        completion(file_url.relativePath)
+                        completion(file_url as String, libraryItem)
                     }
                 }
             }
@@ -233,21 +320,21 @@ final class PhotoLibraryService {
                     if( avAsset is AVURLAsset ) {
                         let video_asset = avAsset as! AVURLAsset
                         let url = URL(fileURLWithPath: video_asset.url.relativePath)
-                        completion(url.relativePath)
+                        completion(url.relativePath, libraryItem)
                     }
                     else if(avAsset is AVComposition) {
                         let token = info?["PHImageFileSandboxExtensionTokenKey"] as! String
                         let path = token.components(separatedBy: ";").last
-                        completion(path)
+                        completion(path, libraryItem)
                     }
                 })
             }
             else if(mediaType == "audio") {
                 // TODO:
-                completion(nil)
+                completion(nil, libraryItem)
             }
             else {
-                completion(nil) // unknown
+                completion(nil, libraryItem) // unknown
             }
         })
     }
@@ -356,7 +443,7 @@ final class PhotoLibraryService {
             let asset = obj as! PHAsset
 
             PHImageManager.default().requestImageData(for: asset, options: self.imageRequestOptions) {
-                (imageData: Data?, dataUTI: String?, orientation: UIImageOrientation, info: [AnyHashable: Any]?) in
+                (imageData: Data?, dataUTI: String?, orientation: UIImage.Orientation, info: [AnyHashable: Any]?) in
 
                 guard let image = imageData != nil ? UIImage(data: imageData!) : nil else {
                     completion(nil)
@@ -388,7 +475,7 @@ final class PhotoLibraryService {
 
             if(mediaType == "image") {
                 PHImageManager.default().requestImageData(for: asset, options: self.imageRequestOptions) {
-                    (imageData: Data?, dataUTI: String?, orientation: UIImageOrientation, info: [AnyHashable: Any]?) in
+                    (imageData: Data?, dataUTI: String?, orientation: UIImage.Orientation, info: [AnyHashable: Any]?) in
 
                     if(imageData == nil) {
                         completion(nil)
@@ -556,16 +643,17 @@ final class PhotoLibraryService {
             saveImage(photoAlbum)
             return
         }
+        else{
+            PhotoLibraryService.createPhotoAlbum(album) { (photoAlbum: PHAssetCollection?, error: String?) in
 
-        PhotoLibraryService.createPhotoAlbum(album) { (photoAlbum: PHAssetCollection?, error: String?) in
+                guard let photoAlbum = photoAlbum else {
+                    completion(nil, error)
+                    return
+                }
 
-            guard let photoAlbum = photoAlbum else {
-                completion(nil, error)
-                return
+                saveImage(photoAlbum)
+
             }
-
-            saveImage(photoAlbum)
-
         }
 
     }
@@ -587,11 +675,9 @@ final class PhotoLibraryService {
             //                return
             //            }
             //            UISaveVideoAtPathToSavedPhotosAlbum(videoURL.relativePath!, nil, nil, nil)
-
             if !assetsLibrary.videoAtPathIs(compatibleWithSavedPhotosAlbum: videoURL) {
 
                 // TODO: try to convert to MP4 as described here?: http://stackoverflow.com/a/39329155/1691132
-
                 completion(nil, "Provided video is not compatible with Saved Photo album")
                 return
             }
@@ -666,10 +752,9 @@ final class PhotoLibraryService {
     fileprivate func getDataFromURL(_ url: String) throws -> Data {
         if url.hasPrefix("data:") {
 
-            guard let match = self.dataURLPattern.firstMatch(in: url, options: NSRegularExpression.MatchingOptions(rawValue: 0), range: NSMakeRange(0, url.characters.count)) else { // TODO: firstMatchInString seems to be slow for unknown reason
+            guard let match = self.dataURLPattern.firstMatch(in: url, options: NSRegularExpression.MatchingOptions(rawValue: 0), range: NSMakeRange(0, url.count)) else { // TODO: firstMatchInString seems to be slow for unknown reason
                 throw PhotoLibraryError.error(description: "The dataURL could not be parsed")
             }
-            // this was fixed?
             let dataPos = match.range(at: 0).length
             let base64 = (url as NSString).substring(from: dataPos)
             guard let decoded = Data(base64Encoded: base64, options: NSData.Base64DecodingOptions(rawValue: 0)) else {
@@ -724,7 +809,6 @@ final class PhotoLibraryService {
         //        let provider: CGDataProvider = CGImageGetDataProvider(image.CGImage)!
         //        let data = CGDataProviderCopyData(provider)
         //        return data;
-
         var data: Data?
         var mimeType: String?
 
