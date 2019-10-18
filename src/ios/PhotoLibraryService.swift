@@ -307,9 +307,27 @@ final class PhotoLibraryService {
                         completion(nil, libraryItem)
                     }
                     else {
-                        let file_url:NSString = (info!["PHImageFileUTIKey"] as? NSString)!
-//                        let mime_type = self.mimeTypes[file_url.pathExtension.lowercased()]!
-                        completion(file_url as String, libraryItem)
+                      // new fix
+                      // if ios13 and above need to fetch from debugDescription text
+                      if(self.SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(version: "13.0")) {
+                          let assetResources = PHAssetResource.assetResources(for: asset);
+                          let assetResource = assetResources.first;
+                          let regex = try! NSRegularExpression(pattern: "(?<=fileURL: ).*(?=\\s)");
+                          let description = assetResource.debugDescription;
+                          if let result = regex.firstMatch(in: description, options: [], range: NSRange(location: 0, length: description.count)) {
+                              let url = String(description[Range(result.range, in: description)!]);
+                              print("asset");
+                              print(url);
+                              completion(url, libraryItem);
+                          }
+
+                      }
+                      else {
+                          // ios12 and below
+                          // will revert to old version
+                          let file_url:URL = info!["PHImageFileURLKey"] as! URL
+                          completion(file_url.relativePath, libraryItem)
+                      }
                     }
                 }
             }
