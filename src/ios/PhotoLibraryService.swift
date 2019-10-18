@@ -280,6 +280,9 @@ final class PhotoLibraryService {
         return "application/octet-stream"
     }
 
+    func SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(version: String) -> Bool {
+        return UIDevice.current.systemVersion.compare(version, options: .numeric) != ComparisonResult.orderedAscending
+    }
 
     func getCompleteInfo(_ libraryItem: NSDictionary, completion: @escaping (_ fullPath: String?,_ libraryItemOrigin: NSDictionary) -> Void) {
 
