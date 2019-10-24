@@ -209,8 +209,16 @@ final class PhotoLibraryService {
         }
         else {
             if(options.includeImages == true) {
-                fetchOptions.predicate = NSPredicate(format: "mediaType == %d",
-                                                     PHAssetMediaType.image.rawValue)
+                if #available(iOS 11.0, *) {
+                  fetchOptions.predicate = NSPredicate(format: "mediaType == %d && playbackStyle == %d",
+                            PHAssetMediaType.image.rawValue,
+                            PHAsset.PlaybackStyle.image.rawValue)
+                }
+                else {
+                  fetchOptions.predicate = NSPredicate(format: "mediaType == %d",
+                            PHAssetMediaType.image.rawValue)
+                }
+
             }
             else if(options.includeVideos == true) {
                 fetchOptions.predicate = NSPredicate(format: "mediaType == %d",
