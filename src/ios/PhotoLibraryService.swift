@@ -239,19 +239,19 @@ final class PhotoLibraryService {
         var chunkNum = 0
 
         fetchResult.enumerateObjects({ (asset: PHAsset, index, stop) in
-            // new code start!
+            // new code start
             if(options.chunkIndex != 0) {
                // only run if the chunk index is passed
                if(index + 1 >= (options.chunkIndex * options.itemsInChunk)
-               && (index + 1) < (options.chunkIndex * (options.itemsInChunk * 2))) {
-                 chunk = [NSDictionary]()
+               && (index + 1) < ((options.chunkIndex + 1) * options.itemsInChunk)) {
+
                  let libraryItem = self.assetToLibraryItem(asset: asset, useOriginalFileNames: options.useOriginalFileNames, includeAlbumData: options.includeAlbumData)
                  chunk.append(libraryItem)
                  self.getCompleteInfo(libraryItem, completion: { (fullPath, libraryItemOrigin) in
 
                      libraryItem["filePath"] = fullPath
                      // if the last index in lazyloaded chunk
-                     if index == ((options.chunkIndex * (options.itemsInChunk * 2)) - 1) { // Last item
+                     if (index + 1) == (((options.chunkIndex + 1) * options.itemsInChunk) - 1) { // Last item
                          completion(chunk, chunkNum, true)
                      }
                  })
