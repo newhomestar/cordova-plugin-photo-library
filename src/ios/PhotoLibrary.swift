@@ -44,6 +44,7 @@ import Foundation
             let includeVideos = options["includeVideos"] as! Bool
             let includeImages = options["includeImages"] as! Bool
             let maxItems = options["maxItems"] as! Int
+            let chunkIndex = options["chunkIndex"] as! Int
 
             func createResult (library: [NSDictionary], chunkNum: Int, isLastChunk: Bool) -> [String: AnyObject] {
                 let result: NSDictionary = [
@@ -63,7 +64,8 @@ import Foundation
                                                                   includeAlbumData: includeAlbumData,
                                                                   includeCloudData: includeCloudData,
                                                                   includeVideos: includeVideos,
-                                                                  maxItems: maxItems)
+                                                                  maxItems: maxItems,
+                                                                  chunkIndex: chunkIndex)
 
             service.getLibrary(getLibraryOptions,
                 completion: { (library, chunkNum, isLastChunk) in

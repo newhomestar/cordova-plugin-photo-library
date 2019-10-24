@@ -239,30 +239,51 @@ final class PhotoLibraryService {
         var chunkNum = 0
 
         fetchResult.enumerateObjects({ (asset: PHAsset, index, stop) in
+            // new code start!
+            if(options.chunkIndex != 0) {
+               // only run if the chunk index is passed
+               if(index + 1 >= (options.chunkIndex * options.itemsInChunk)
+               && (index + 1) < (options.chunkIndex * (options.itemsInChunk * 2))) {
+                 chunk = [NSDictionary]()
+                 let libraryItem = self.assetToLibraryItem(asset: asset, useOriginalFileNames: options.useOriginalFileNames, includeAlbumData: options.includeAlbumData)
+                 chunk.append(libraryItem)
+                 self.getCompleteInfo(libraryItem, completion: { (fullPath, libraryItemOrigin) in
 
-            if (options.maxItems > 0 && index + 1 > options.maxItems) {
-                completion(chunk, chunkNum, true)
-                return
+                     libraryItem["filePath"] = fullPath
+                     // if the last index in lazyloaded chunk
+                     if index == ((options.chunkIndex * (options.itemsInChunk * 2)) - 1) { // Last item
+                         completion(chunk, chunkNum, true)
+                     }
+                 })
+               }
             }
+            else {
+              // if no chunk index is passed
+              // preform exact same behavior
+              if (options.maxItems > 0 && index + 1 > options.maxItems) {
+                  completion(chunk, chunkNum, true)
+                  return
+              }
 
-            let libraryItem = self.assetToLibraryItem(asset: asset, useOriginalFileNames: options.useOriginalFileNames, includeAlbumData: options.includeAlbumData)
+              let libraryItem = self.assetToLibraryItem(asset: asset, useOriginalFileNames: options.useOriginalFileNames, includeAlbumData: options.includeAlbumData)
 
-            chunk.append(libraryItem)
+              chunk.append(libraryItem)
 
-            self.getCompleteInfo(libraryItem, completion: { (fullPath, libraryItemOrigin) in
+              self.getCompleteInfo(libraryItem, completion: { (fullPath, libraryItemOrigin) in
 
-                libraryItem["filePath"] = fullPath
+                  libraryItem["filePath"] = fullPath
 
-                if index == fetchResult.count - 1 { // Last item
-                    completion(chunk, chunkNum, true)
-                } else if (options.itemsInChunk > 0 && chunk.count == options.itemsInChunk) ||
-                    (options.chunkTimeSec > 0 && abs(chunkStartTime.timeIntervalSinceNow) >= options.chunkTimeSec) {
-                    completion(chunk, chunkNum, false)
-                    chunkNum += 1
-                    chunk = [NSDictionary]()
-                    chunkStartTime = NSDate()
-                }
-            })
+                  if index == fetchResult.count - 1 { // Last item
+                      completion(chunk, chunkNum, true)
+                  } else if (options.itemsInChunk > 0 && chunk.count == options.itemsInChunk) ||
+                      (options.chunkTimeSec > 0 && abs(chunkStartTime.timeIntervalSinceNow) >= options.chunkTimeSec) {
+                      completion(chunk, chunkNum, false)
+                      chunkNum += 1
+                      chunk = [NSDictionary]()
+                      chunkStartTime = NSDate()
+                  }
+              })
+            }
         })
     }
 

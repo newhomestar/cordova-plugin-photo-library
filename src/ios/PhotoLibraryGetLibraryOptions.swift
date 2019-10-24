@@ -11,4 +11,5 @@ struct PhotoLibraryGetLibraryOptions {
     let includeCloudData: Bool
     let includeVideos: Bool
     let maxItems: Int
+    let chunkIndex: Int
 }
